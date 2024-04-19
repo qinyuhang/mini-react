@@ -1,3 +1,4 @@
+import { createRoot as createRootFiber } from './fiber.ts';
 /***
  * @deprecated use createRoot
  * */
@@ -8,7 +9,7 @@ function render(element: Element, container: Element) {
   }
 }
 
-function createRoot(container: Element) {
+function createRoot(container: HTMLElement) {
   const rootEl = document.createDocumentFragment();
   container.appendChild(rootEl);
   return {
@@ -16,10 +17,7 @@ function createRoot(container: Element) {
      * @param ele React.Element
      * */
     render: function(ele: any) {
-      const dom = renderDom(ele);
-      if (dom) {
-        container.appendChild(dom);
-      }
+      createRootFiber(ele, container);
     },
     unmount: function() {
       container.removeChild(rootEl);
@@ -27,11 +25,39 @@ function createRoot(container: Element) {
   }
 }
 
+//
+// 更新 dom 属性
+function updateAttributes(dom: HTMLElement, attributes: Record<string, any>) {
+  Object.keys(attributes).forEach((key) => {
+    if (key.startsWith('on')) {
+      // 事件的处理
+      const eventName = key.slice(2).toLowerCase();
+      dom.addEventListener(eventName, attributes[key]);
+    } else if (key === 'className') {
+      // className 的处理
+      const classes = attributes[key].split(' ');
+      classes.forEach((classKey: string) => {
+        dom.classList.add(classKey);
+      });
+    } else if (key === 'style') {
+      // style处理
+      const style = attributes[key];
+      Object.keys(style).forEach((styleName) => {
+        (dom.style as any)[styleName] = style[styleName];
+      });
+    } else {
+      // 其他属性的处理
+      // @ts-ignore
+      dom.setAttribute(key, attributes[key]);
+      // dom[key] = attributes[key];
+    }
+  });
+}
 /**
  * @param ele React.Element
  * */
-function renderDom(element: any): Node | null {
-  debugger;
+export function renderDom(element: any): Node | null {
+  // debugger;
   let dom = null;
   if (!element && element !== 0) { return null }
   if (typeof element === 'string') {
@@ -40,33 +66,21 @@ function renderDom(element: any): Node | null {
   if (typeof element === 'number') {
     return document.createTextNode(String(element));
   }
-  if (Array.isArray(element)) {
-    dom = document.createDocumentFragment();
-    for (let item of element) {
-      const child = renderDom(item);
-      if (child) {
 
-      dom.appendChild(child);
-      }
-      return dom;
-    }
-  }
-  const { type, props: { children } } = element;
+  const { type, props: { children, ...attributes } } = element;
 
-  if (typeof type === 'string') {
-    dom = document.createElement(type);
-  } else if (typeof type === 'function') {
-    console.log("React function")
-    if (type.prototype.isReactComponent) {} else {}
+  if (typeof type === 'string' || typeof type === "symbol") {
+    // TODO iterate all symbols
+    dom = document.createElement(String(type));
   } else if (typeof type === 'symbol') {
     return document.createTextNode(String(type))
+  } else if (typeof type === 'function') {
+    dom = document.createDocumentFragment() as any;
   } else {
     return null;
   }
-  const testEl = document.createElement('div');
-  testEl.innerHTML = 'Hello World'
-  return testEl;
-  // return document.createDocumentFragment()
+  updateAttributes(dom, attributes);
+  return dom;
 }
 
 const ReactDOM = {
