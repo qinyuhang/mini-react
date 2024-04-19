@@ -48,8 +48,8 @@ function updateAttributes(dom: HTMLElement, attributes: Record<string, any>) {
     } else {
       // 其他属性的处理
       // @ts-ignore
-      dom.setAttribute(key, attributes[key]);
-      // dom[key] = attributes[key];
+      // dom.setAttribute(key, attributes[key]);
+      dom[key] = attributes[key];
     }
   });
 }

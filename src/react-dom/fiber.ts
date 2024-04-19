@@ -1,19 +1,23 @@
 import { renderDom } from './client'
 import { commitRoot } from './commit';
+import { reconcileChildren } from './reconciler.ts';
 
 let nextUnitOfWork: null | Fiber = null;
-let rootFiber: null | Fiber = null;
+let workInProgressRoot: null | Fiber = null;
+let currentRoot: null | Fiber = null;
 
-export interface Fiber {
-  /** coresponding html element */
-  stateNode: any;
-  /** coresponding React Component */
-  element?: {
+export interface FiberElement {
     props: {
       children: Array<any>
     },
     type?: any;
-  };
+}
+export interface Fiber {
+  /** coresponding html element */
+  stateNode: any;
+  /** coresponding React Component */
+  element?: FiberElement;
+  alternate?: Fiber|null,
   /** parent */
   return?: Fiber;
   child?: Fiber;
@@ -22,15 +26,16 @@ export interface Fiber {
 
 
 export function createRoot(element: any, container: HTMLElement) {
-  rootFiber = {
+  workInProgressRoot = {
     stateNode: container,
     element: {
       props: {
         children: [element]
       }
-    }
+    },
+    alternate: currentRoot,
   };
-  nextUnitOfWork = rootFiber
+  nextUnitOfWork = workInProgressRoot;
 }
 
 function performUnitOfWork(workInProgress: Fiber) {
@@ -79,24 +84,7 @@ function performUnitOfWork(workInProgress: Fiber) {
     let elements = Array.isArray(children) ? children : [children];
     elements = elements.flat();
 
-    let index = 0;
-    let prevSibling = null;
-
-    while (index < elements.length) {
-      const element = elements[index];
-      const newFiber: Fiber = {
-        element,
-        return: workInProgress,
-        stateNode: null,
-      };
-      if (index === 0) {
-        workInProgress.child = newFiber;
-      } else {
-        prevSibling!.sibling = newFiber;
-      }
-      prevSibling = newFiber;
-      index++;
-    }
+    reconcileChildren(workInProgress, elements);
   }
   // 设置下一个工作单元
   if (workInProgress.child) {
@@ -131,9 +119,10 @@ export function workLoop(deadline: IdleDeadline) {
     shouldYield = deadline.timeRemaining() < 1;
   }
   // commit phrase
-  if (!nextUnitOfWork && rootFiber) {
-    commitRoot(rootFiber);
-    rootFiber = null;
+  if (!nextUnitOfWork && workInProgressRoot) {
+    commitRoot(workInProgressRoot);
+    currentRoot = workInProgressRoot;
+    workInProgressRoot = null;
   }
   requestIdleCallback(workLoop);
 }
